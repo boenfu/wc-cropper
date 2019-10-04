@@ -1,65 +1,204 @@
-class Cropper extends HTMLElement {
-  constructor() {
-    super();
+class WCCropper extends HTMLElement {
+  constructor () {
+    super()
 
-    let shadow = this.attachShadow({ mode: "open" });
+    let shadow = this.attachShadow({ mode: 'open' })
 
-    let style = window.document.createElement("style");
+    let style = window.document.createElement('style')
 
-    style.textContent = Cropper._default_style;
+    style.textContent = WCCropper._default_style
 
-    shadow.appendChild(style);
+    shadow.appendChild(style)
 
-    let button = window.document.createElement("button");
+    let button = window.document.createElement('button')
 
-    button.className = "wc-cropper-primary";
-    button.innerText = "裁剪";
-    button.onclick = this.open;
+    button.className = 'wc-cropper-primary'
+    button.innerText = '裁剪'
+    button.onclick = this.open
 
-    shadow.appendChild(button);
+    shadow.appendChild(button)
+  }
+
+  currentImage
+  popupContent
+
+  get active () {
+    let open = this.attributes.getNamedItem('open')
+    return !!(open && open.value !== 'false')
   }
 
   open = () => {
-    this.setAttribute("open", "true");
-  };
-
-  close = () => {
-    this.removeAttribute("open");
-  };
-
-  get active() {
-    let open = this.attributes.getNamedItem("open");
-    return !!(open && open.value !== "false");
+    this.setAttribute('open', 'true')
   }
 
-  attributeChangedCallback() {
-    if (this.active) {
-      this.renderPopup();
-    } else {
-      this.destroyPopup();
+  close = () => {
+    this.removeAttribute('open')
+  }
+
+  pickImage = () => {
+    let fileInput = document.createElement('input')
+
+    fileInput.setAttribute('type', 'file')
+    fileInput.setAttribute('accept', '.png, .jpg, .jpeg')
+    fileInput.click()
+
+    fileInput.onchange = () => {
+      let fileReader = new FileReader()
+
+      if (!fileInput.files) {
+        return
+      }
+
+      let [file] = fileInput.files
+
+      fileReader.readAsDataURL(file)
+      fileReader.onload = ({ target }) => {
+        if (!target) {
+          return
+        }
+
+        let { readyState, result } = target
+
+        if (readyState === FileReader.DONE) {
+          let img = new Image()
+          img.src = result
+          img.onload = () => {
+            this.displayImage(img)
+          }
+        }
+      }
     }
   }
 
-  renderPopup() {
-    let content = window.document.createElement("div");
+  displayImage (img) {
+    let area = this.shadowRoot.querySelector('.wc-cropper-area')
 
-    content.innerHTML = Cropper._popup_template;
+    if (this.currentImage) {
+      area.removeChild(this.currentImage)
+    }
 
-    this.shadowRoot.appendChild(content);
+    let scaleX = img.width / area.clientWidth
+    let scaleY = img.height / area.clientHeight
 
-    let closeIcon = this.shadowRoot.querySelector(".wc-cropper-header i");
-    let cancelButton = this.shadowRoot.querySelector(
-      ".wc-cropper-footer .wc-cropper-secondary "
-    );
+    let scale = Math.max(scaleX, scaleY)
 
-    closeIcon.onclick = this.close;
-    cancelButton.onclick = this.close;
+    img.style.transform = `scale(${scale > 1 ? 1 / scale : scale})`
 
-    this.popupContent = content;
+    area.appendChild(img)
+
+    this.currentImage = img
   }
 
-  destroyPopup() {
-    this.shadowRoot.removeChild(this.popupContent);
+  processingImage = ({ target }) => {
+    if (!this.currentImage) {
+      return
+    }
+
+    while (!target.dataset.type) {
+      target = target.parentNode
+    }
+
+    switch (target.dataset.type) {
+      case 'turn-left':
+      case 'turn-right':
+        this.turnImage()
+        break
+      case 'shrink':
+        this.scaleImage(0.8)
+        break
+      case 'zoom':
+        this.scaleImage(1.2)
+        break
+      case 'rotate':
+        this.rotateImage(45)
+        break
+    }
+  }
+
+  scaleImage = scale => {
+    let matrix = [scale, 0, 0, scale, 0, 0]
+
+    this._setImageTransformMatrix(this.currentImage, matrix)
+  }
+
+  rotateImage = angle => {
+    let radian = (Math.PI / 180) * angle
+    let sin = Math.sin(radian)
+    let cos = Math.cos(radian)
+
+    let matrix = [cos, sin, -sin, cos, 0, 0]
+
+    this._setImageTransformMatrix(this.currentImage, matrix)
+  }
+
+  turnImage = () => {
+    let matrix = [-1, 0, 0, 1, 0, 0]
+
+    this._setImageTransformMatrix(this.currentImage, matrix)
+  }
+
+  _getImageTransformMatrix (img) {
+    let res = getComputedStyle(img).transform.match(/(?<=\().*(?=\))/)
+
+    if (!res || !res[0]) {
+      return [1, 0, 0, 1, 0, 0]
+    }
+
+    return res[0].split(',')
+  }
+
+  _setImageTransformMatrix (img, m) {
+    let oM = this._getImageTransformMatrix(img)
+
+    let nM = [
+      oM[0] * m[0] + oM[2] * m[1],
+      oM[1] * m[0] + oM[3] * m[1],
+      oM[0] * m[2] + oM[2] * m[3],
+      oM[1] * m[2] + oM[3] * m[3],
+      oM[0] * m[4] + oM[2] * m[5] + oM[4] * 1,
+      oM[1] * m[4] + oM[3] * m[5] + oM[5] * 1
+    ]
+
+    img.style.transform = `matrix(${nM.join(',')})`
+  }
+
+  renderPopup () {
+    let content = window.document.createElement('div')
+
+    content.innerHTML = WCCropper._popup_template
+
+    this.shadowRoot.appendChild(content)
+
+    let closeIcon = this.shadowRoot.querySelector('.wc-cropper-header i')
+    let cancelButton = this.shadowRoot.querySelector(
+      '.wc-cropper-footer .wc-cropper-secondary '
+    )
+
+    let pickImageButton = this.shadowRoot.querySelector(
+      '.wc-cropper-right .wc-cropper-secondary '
+    )
+
+    let menu = this.shadowRoot.querySelector('.wc-cropper-menu')
+
+    closeIcon.onclick = this.close
+    cancelButton.onclick = this.close
+    pickImageButton.onclick = this.pickImage
+    menu.onclick = this.processingImage
+
+    this.popupContent = content
+  }
+
+  destroyPopup () {
+    this.currentImage = undefined
+    this.shadowRoot.removeChild(this.popupContent)
+  }
+
+  attributeChangedCallback () {
+    if (this.active) {
+      this.renderPopup()
+    } else {
+      this.destroyPopup()
+    }
   }
 
   static _popup_template = `
@@ -79,27 +218,27 @@ class Cropper extends HTMLElement {
           <div class="wc-cropper-area"></div>
           <div class="wc-cropper-menu-wrapper">
             <ul class="wc-cropper-menu">
-              <li title="左翻转">
+              <li title="左翻转" data-type="turn-left">
                 <svg class="wc-cropper" aria-hidden="true">
                   <use xlink:href="#wc-cropper-shangyibu"></use>
                 </svg>
               </li>
-              <li title="右翻转">
+              <li title="右翻转" data-type="turn-right">
                 <svg class="wc-cropper" aria-hidden="true">
                   <use xlink:href="#wc-cropper-xiayibu"></use>
                 </svg>
               </li>
-              <li title="缩小">
+              <li title="缩小" data-type="shrink">
                 <svg class="wc-cropper" aria-hidden="true">
                   <use xlink:href="#wc-cropper-suoxiao"></use>
                 </svg>
               </li>
-              <li title="放大">
+              <li title="放大" data-type="zoom">
                 <svg class="wc-cropper" aria-hidden="true">
                   <use xlink:href="#wc-cropper-fangda"></use>
                 </svg>
               </li>
-              <li title="旋转45°">
+              <li title="旋转45°" data-type="rotate">
                 <svg class="wc-cropper" aria-hidden="true">
                   <use xlink:href="#wc-cropper-shuaxin"></use>
                 </svg>
@@ -111,7 +250,6 @@ class Cropper extends HTMLElement {
           <div class="wc-cropper-square"></div>
           <div class="wc-cropper-circle"></div>
           <button class="wc-cropper-secondary">选择图片</button>
-          <input type="file" />
         </div>
       </div>
       <div class="wc-cropper-footer">
@@ -120,7 +258,7 @@ class Cropper extends HTMLElement {
       </div>
     </div>
   </div>
-  `;
+  `
 
   static _default_style = `
   .wc-cropper {
@@ -200,14 +338,19 @@ class Cropper extends HTMLElement {
     flex: 1;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
 
   .wc-cropper-area {
     flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 2px;
     background-size: 18px;
     background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAF0AAABcCAYAAAAMLblmAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAHYcAAB2HAY/l8WUAAAUeSURBVHhe7Z3XbiQ5DEX7/3/L45xzgHN2O+dsLQ6B21Pr9cM+DHA5AAlcSMXyg3REUeoHlnu7u7vt6OionZ6eptHJyUk7Pj6O9uzsLIS/O07eb29vt83Nzba1tZVCjGV9fT36Ozs70TJGtLGx0VZWVqLtra6utvPz8/b5+ZlKLy8v7fn5ub29vYVeX1/b09NT+GkvLy/b2tpam56ebuPj42k0NjbWZmdn2/z8fIyNdmFhIXxTU1MBPiL99vb2x4k79PX11TD6Hx8fAx8t8NUyZibARJhcBjEWwM/MzATk0dHR8M/NzQ2gsxN6h4eH7eHhISaTRUAGOJLhF/T39/d2f3/flpaW2uTkZEwog4ANWKIb0L9+/Ypn+oh+pJe9vb2YQBZTVJNaEM8I0AQHCyHobFsii8lkEFENcHYgYxsaGgo/PqWbgE56yQQdE2QiW8ZCkNcV8Tc3N215efk/E3dL4InskZGR8LED8LMrOYdSQse+pxelHFqgX19fNy4BTOb7xJ2amJgYpBtyOj4B5x1jLuh/WAXdoIJuUEE3qKAbVNANKugGFXSDCrpBBd2ggm5QQTeooBtU0A0q6AYVdIMKukEF3aCCblBBN6igG1TQDSroBhV0gwq6QQXdoIJuUEE3qKAbVNANKugGFXSDCrpB/ws6NY5UqmWz79Ape6GcUYVe3eq6TKIGStCHh4fDRx/wvIuSRgpMM0IHLCKy9fz4+DhYDIq+VHPEhDJI0FXC2K2uo+6IyF9cXPxd0pjFgNytrgMwz7Qq9KLPAii9KLLcAiyi1BJRyMv48LEYLAJFYL39/f12d3c3iCC3gIrI20DGp4VQn3fsTiKdXJlJ5G0iG7hAl49KO6BHpJPTr66uBts5gwALYPpaDARsfJSpU1qv4l2iKIt0eBLdQAc4ws9z5HQ+IkCdvSLMLcHWNwBII6Q/blhEN/WjFxcX8XEGajIpkiWysog0Q5RrXLQSQQLvqJjOJlLeT/rp7w4ODhrnUgYRCHydA9GX9J6xMuYeTg4kbYMM0jWrGyWIfIjYoqRFIp4dwI7IIH21g1bP7FSJs5PPqPSgz4HUvfo4RY7mfgt8nlkALYbyN36+JkG6IR1xBmRS92xS2lSfH3U9PgZDDmJCWQRoxkRUE/E84we2bgQEiqBrYhnEeHTdxboLgHEmxe2FCSqa3AIwBxBQSSNABza3AVIMfwN0DqVMV10JwEongCbdcCkQ+IBOTmdyTCyTAKxgADLwGad+gNDP9KOua/y+ALT6yu/shICunE6EZZCgA1m/5ICuSFea4fDnENW2zWSKeEwLgG8Q6Vxh2Ko/AXBJ4OkLuhaCZ/zc0UkvRE82A66CAehIFgdpQf/zVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtAN9ldCR6otUs3R31D+wlgIAoq7EAZw6o0oh+Hdv6ArutwCONFMVFNl1y306ta7dgu9FFluAZXaIgq7VF0HdPr4AM93GAI6k2FSGQRg/iG2PmbA1yOQFoIWP2NWpGcS4AGt6jqeJd5HpFPHTtQw2QwCqiqmFfUq2AW6/IyZCag+M4MAy3hUvItPlXa0KCL95OQkDqXvk3dJ+VzfAqCWlDRDSxrUlyUYc7/fj62rHOoW0c3uo2yRam6eSYEc+Pjp9/v99g9FavxToWrNSwAAAABJRU5ErkJggg==);
     margin: 10px 0;
+    overflow: hidden;
   }
 
   .wc-cropper-menu-wrapper {
@@ -271,12 +414,6 @@ class Cropper extends HTMLElement {
     border-radius: 50%;
   }
 
-  .wc-cropper-right input {
-    width: 0;
-    height: 0;
-    visibility: hidden;
-  }
-
   .wc-cropper-footer {
     height: 48px;
     border-top: 1px solid #eee;
@@ -309,11 +446,15 @@ class Cropper extends HTMLElement {
   .wc-cropper-primary:hover {
     filter: brightness(1.1);
   }
- `;
+ `
 
-  static get observedAttributes() {
-    return ["open"];
+  static get observedAttributes () {
+    return ['open']
+  }
+
+  static get version () {
+    return 1.0
   }
 }
 
-window.customElements.define("wc-cropper", Cropper);
+window.customElements.define('wc-cropper', WCCropper)
