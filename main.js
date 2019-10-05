@@ -20,6 +20,7 @@ class WCCropper extends HTMLElement {
   }
 
   currentImage
+  croppedImage
   popupContent
 
   get active () {
@@ -87,6 +88,8 @@ class WCCropper extends HTMLElement {
     area.appendChild(img)
 
     this.currentImage = img
+
+    this._setCroppedImage()
   }
 
   processingImage = ({ target }) => {
@@ -138,6 +141,24 @@ class WCCropper extends HTMLElement {
   }
 
   cropImage = () => {
+    let data = this.croppedImage
+
+    if (!data) {
+      return
+    }
+
+    let event = document.createEvent('Event')
+
+    event.initEvent('oncrop', true, true)
+
+    event.data = data
+
+    this.dispatchEvent(event)
+
+    return data
+  }
+
+  _setCroppedImage () {
     let img = this.currentImage
 
     if (!img) {
@@ -151,13 +172,15 @@ class WCCropper extends HTMLElement {
     canvas.height = img.height
     context.drawImage(img, 0, 0)
 
-    let event = document.createEvent('Event')
+    let data = canvas.toDataURL()
 
-    event.initEvent('oncrop', true, true)
+    let squarePreview = this.shadowRoot.querySelector('.wc-cropper-square')
+    let circlePreview = this.shadowRoot.querySelector('.wc-cropper-circle')
 
-    event.data = canvas.toDataURL()
+    squarePreview.style.backgroundImage = `url('${data}')`
+    circlePreview.style.backgroundImage = `url('${data}')`
 
-    this.dispatchEvent(event)
+    this.croppedImage = data
   }
 
   _getImageTransformMatrix (img) {
@@ -183,6 +206,8 @@ class WCCropper extends HTMLElement {
     ]
 
     img.style.transform = `matrix(${nM.join(',')})`
+
+    this._setCroppedImage()
   }
 
   renderPopup () {
@@ -242,7 +267,22 @@ class WCCropper extends HTMLElement {
       </div>
       <div class="wc-cropper-main">
         <div class="wc-cropper-left">
-          <div class="wc-cropper-area"></div>
+          <div class="wc-cropper-area">
+            <div class="wc-cropper-select-area-wrapper">
+              <div class="wc-cropper-select-area">
+                <i class="wc-cropper-select-mask-top"></i>
+                <span class="wc-cropper-select-point wc-top-left"></span>
+                <span class="wc-cropper-select-point wc-top"></span>
+                <span class="wc-cropper-select-point wc-top-right"></span>
+                <span class="wc-cropper-select-point wc-left"></span>
+                <span class="wc-cropper-select-point wc-right"></span>
+                <span class="wc-cropper-select-point wc-bottom-left"></span>
+                <span class="wc-cropper-select-point wc-bottom"></span>
+                <span class="wc-cropper-select-point wc-bottom-right"></span>
+                <i class="wc-cropper-select-mask-bottom"></i>
+              </div>
+            </div>
+          </div>
           <div class="wc-cropper-menu-wrapper">
             <ul class="wc-cropper-menu">
               <li title="左翻转" data-type="turn-left">
@@ -369,6 +409,7 @@ class WCCropper extends HTMLElement {
   }
 
   .wc-cropper-area {
+    position: relative;
     flex: 1;
     display: flex;
     align-items: center;
@@ -378,6 +419,127 @@ class WCCropper extends HTMLElement {
     background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAF0AAABcCAYAAAAMLblmAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAHYcAAB2HAY/l8WUAAAUeSURBVHhe7Z3XbiQ5DEX7/3/L45xzgHN2O+dsLQ6B21Pr9cM+DHA5AAlcSMXyg3REUeoHlnu7u7vt6OionZ6eptHJyUk7Pj6O9uzsLIS/O07eb29vt83Nzba1tZVCjGV9fT36Ozs70TJGtLGx0VZWVqLtra6utvPz8/b5+ZlKLy8v7fn5ub29vYVeX1/b09NT+GkvLy/b2tpam56ebuPj42k0NjbWZmdn2/z8fIyNdmFhIXxTU1MBPiL99vb2x4k79PX11TD6Hx8fAx8t8NUyZibARJhcBjEWwM/MzATk0dHR8M/NzQ2gsxN6h4eH7eHhISaTRUAGOJLhF/T39/d2f3/flpaW2uTkZEwog4ANWKIb0L9+/Ypn+oh+pJe9vb2YQBZTVJNaEM8I0AQHCyHobFsii8lkEFENcHYgYxsaGgo/PqWbgE56yQQdE2QiW8ZCkNcV8Tc3N215efk/E3dL4InskZGR8LED8LMrOYdSQse+pxelHFqgX19fNy4BTOb7xJ2amJgYpBtyOj4B5x1jLuh/WAXdoIJuUEE3qKAbVNANKugGFXSDCrpBBd2ggm5QQTeooBtU0A0q6AYVdIMKukEF3aCCblBBN6igG1TQDSroBhV0gwq6QQXdoIJuUEE3qKAbVNANKugGFXSDCrpB/ws6NY5UqmWz79Ape6GcUYVe3eq6TKIGStCHh4fDRx/wvIuSRgpMM0IHLCKy9fz4+DhYDIq+VHPEhDJI0FXC2K2uo+6IyF9cXPxd0pjFgNytrgMwz7Qq9KLPAii9KLLcAiyi1BJRyMv48LEYLAJFYL39/f12d3c3iCC3gIrI20DGp4VQn3fsTiKdXJlJ5G0iG7hAl49KO6BHpJPTr66uBts5gwALYPpaDARsfJSpU1qv4l2iKIt0eBLdQAc4ws9z5HQ+IkCdvSLMLcHWNwBII6Q/blhEN/WjFxcX8XEGajIpkiWysog0Q5RrXLQSQQLvqJjOJlLeT/rp7w4ODhrnUgYRCHydA9GX9J6xMuYeTg4kbYMM0jWrGyWIfIjYoqRFIp4dwI7IIH21g1bP7FSJs5PPqPSgz4HUvfo4RY7mfgt8nlkALYbyN36+JkG6IR1xBmRS92xS2lSfH3U9PgZDDmJCWQRoxkRUE/E84we2bgQEiqBrYhnEeHTdxboLgHEmxe2FCSqa3AIwBxBQSSNABza3AVIMfwN0DqVMV10JwEongCbdcCkQ+IBOTmdyTCyTAKxgADLwGad+gNDP9KOua/y+ALT6yu/shICunE6EZZCgA1m/5ICuSFea4fDnENW2zWSKeEwLgG8Q6Vxh2Ko/AXBJ4OkLuhaCZ/zc0UkvRE82A66CAehIFgdpQf/zVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtANVtAN9ldCR6otUs3R31D+wlgIAoq7EAZw6o0oh+Hdv6ArutwCONFMVFNl1y306ta7dgu9FFluAZXaIgq7VF0HdPr4AM93GAI6k2FSGQRg/iG2PmbA1yOQFoIWP2NWpGcS4AGt6jqeJd5HpFPHTtQw2QwCqiqmFfUq2AW6/IyZCag+M4MAy3hUvItPlXa0KCL95OQkDqXvk3dJ+VzfAqCWlDRDSxrUlyUYc7/fj62rHOoW0c3uo2yRam6eSYEc+Pjp9/v99g9FavxToWrNSwAAAABJRU5ErkJggg==);
     margin: 10px 0;
     overflow: hidden;
+  }
+  
+  .wc-cropper-select-area-wrapper {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 1;
+  }
+  
+  .wc-cropper-select-area-wrapper:last-child{
+    display:none;
+  }
+
+  .wc-cropper-select-area {
+    position: absolute;
+    left: calc(50% - 100px);
+    top: calc(50% - 100px);
+    width: 200px;
+    height: 200px;
+    background: rgba(255,255,255,0.2);
+    cursor: move;
+  }
+
+  .wc-cropper-select-point {
+    position: absolute;
+    display: block;
+    width: 8px;
+    height: 8px;
+    background: #fff;
+    box-shadow: 0 0 2px #333;
+    border-radius: 50%;
+    transform: translate(-50%,-50%);
+    z-index: 1;
+  }
+
+  .wc-top-left {
+    left:0;
+    top:0;
+    cursor: nw-resize;
+  }
+
+  .wc-top {
+    left:50%;
+    top:0;
+    cursor: n-resize;
+  }
+
+  .wc-top-right {
+    left:100%;
+    top:0;
+    cursor: ne-resize;
+  }
+
+  .wc-left {
+    left:0;
+    top:50%;
+    cursor: w-resize;
+  }
+
+  .wc-right {
+    left:100%;
+    top:50%;
+    cursor: e-resize;
+  }
+
+  .wc-bottom-left {
+    left:0;
+    top:100%;
+    cursor: sw-resize;
+  }
+
+  .wc-bottom {
+    left:50%;
+    top:100%;
+    cursor: s-resize;
+  }
+
+  .wc-bottom-right {
+    left:100%;
+    top:100%;
+    cursor: se-resize;
+  }
+
+
+  .wc-cropper-select-area::after,
+  .wc-cropper-select-area::before {
+    content: '';
+    position: absolute;
+    width:1000px;
+    height:100%;
+    background: rgba(0,0,0,0.5);
+    pointer-events: none;
+  }
+
+  .wc-cropper-select-area::after{
+    left:100%;
+  }
+
+  .wc-cropper-select-area::before {
+    right:100%;
+  }
+
+  .wc-cropper-select-mask-top, 
+  .wc-cropper-select-mask-bottom {
+    content: '';
+    position: absolute;
+    width:1000px;
+    height:1000px;
+    background: rgba(0,0,0,0.5);
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+
+  .wc-cropper-select-mask-top{
+    bottom: 100%;
+  }
+
+  .wc-cropper-select-mask-bottom{
+    top: 100%;
   }
 
   .wc-cropper-menu-wrapper {
@@ -435,6 +597,12 @@ class WCCropper extends HTMLElement {
     height: 100px;
     margin: 20px 0;
     background-color: #eee;
+    background-size: cover;
+    box-shadow: 0 0 2px #ddd;
+  }
+
+  .wc-cropper-square{
+    border-radius: 2px;
   }
 
   .wc-cropper-circle {
