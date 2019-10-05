@@ -4,13 +4,13 @@ class WCCropper extends HTMLElement {
 
     let shadow = this.attachShadow({ mode: 'open' })
 
-    let style = window.document.createElement('style')
+    let style = document.createElement('style')
 
     style.textContent = WCCropper._default_style
 
     shadow.appendChild(style)
 
-    let button = window.document.createElement('button')
+    let button = document.createElement('button')
 
     button.className = 'wc-cropper-primary'
     button.innerText = '裁剪'
@@ -137,6 +137,29 @@ class WCCropper extends HTMLElement {
     this._setImageTransformMatrix(this.currentImage, matrix)
   }
 
+  cropImage = () => {
+    let img = this.currentImage
+
+    if (!img) {
+      return
+    }
+
+    let canvas = document.createElement('canvas')
+    let context = canvas.getContext('2d')
+
+    canvas.width = img.width
+    canvas.height = img.height
+    context.drawImage(img, 0, 0)
+
+    let event = document.createEvent('Event')
+
+    event.initEvent('oncrop', true, true)
+
+    event.data = canvas.toDataURL()
+
+    this.dispatchEvent(event)
+  }
+
   _getImageTransformMatrix (img) {
     let res = getComputedStyle(img).transform.match(/(?<=\().*(?=\))/)
 
@@ -163,7 +186,7 @@ class WCCropper extends HTMLElement {
   }
 
   renderPopup () {
-    let content = window.document.createElement('div')
+    let content = document.createElement('div')
 
     content.innerHTML = WCCropper._popup_template
 
@@ -172,6 +195,9 @@ class WCCropper extends HTMLElement {
     let closeIcon = this.shadowRoot.querySelector('.wc-cropper-header i')
     let cancelButton = this.shadowRoot.querySelector(
       '.wc-cropper-footer .wc-cropper-secondary '
+    )
+    let cropButton = this.shadowRoot.querySelector(
+      '.wc-cropper-footer .wc-cropper-primary '
     )
 
     let pickImageButton = this.shadowRoot.querySelector(
@@ -182,6 +208,7 @@ class WCCropper extends HTMLElement {
 
     closeIcon.onclick = this.close
     cancelButton.onclick = this.close
+    cropButton.onclick = this.cropImage
     pickImageButton.onclick = this.pickImage
     menu.onclick = this.processingImage
 

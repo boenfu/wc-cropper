@@ -23,5 +23,17 @@
   <body>
     <wc-cropper></wc-cropper>
     <script src="./main.js"></script>
+    <script>
+      document.querySelector("wc-cropper").addEventListener(
+        "oncrop",
+        function oncrop({ data }) {
+          let a = document.createElement("a");
+          a.download = Date.now() + ".png";
+          a.href = data;
+          a.click();
+        },
+        false
+      );
+    </script>
   </body>
 </html>
